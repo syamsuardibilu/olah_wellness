@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Olah Data Wellness</title>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+
+font-family:Arial, sans-serif;
+background:#f4f7fb;
+padding:15px;
+
+}
+
+.container{
+
+background:white;
+padding:15px;
+border-radius:12px;
+box-shadow:0 4px 15px rgba(0,0,0,0.08);
+
+}
+
+h2{
+
+margin-top:0;
+color:#1f2d3d;
+
+}
+
+input{
+
+margin-top:10px;
+
+}
+
+.summary{
+
+margin-top:10px;
+font-weight:bold;
+color:#2c3e50;
+
+}
+
+table{
+
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+font-size:13px;
+
+}
+
+th,td{
+
+border:1px solid #ddd;
+padding:6px;
+text-align:left;
+
+}
+
+th{
+
+background:#e9eef5;
+
+}
+
+tr:nth-child(even){
+
+background:#f8fbff;
+
+}
+
+.search{
+
+margin-top:10px;
+width:100%;
+padding:6px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Upload Excel Wellness</h2>
+
+<input type="file" id="file">
+
+<input type="text" id="search" class="search" placeholder="Cari data...">
+
+<div class="summary" id="info"></div>
+
+<div id="table"></div>
+
+</div>
+
+<script>
+
+let globalData=[];
+
+document.getElementById("file").addEventListener("change",function(e){
+
+let reader=new FileReader();
+
+reader.onload=function(event){
+
+let data=new Uint8Array(event.target.result);
+
+let workbook=XLSX.read(data,{type:"array"});
+
+let sheet=workbook.SheetNames[0];
+
+let worksheet=workbook.Sheets[sheet];
+
+globalData=XLSX.utils.sheet_to_json(worksheet,{defval:""});
+
+document.getElementById("info").innerHTML=
+
+"Sheet : "+sheet+
+"<br>Total data : "+globalData.length;
+
+renderTable(globalData);
+
+}
+
+reader.readAsArrayBuffer(e.target.files[0]);
+
+});
+
+document.getElementById("search").addEventListener("keyup",function(){
+
+let keyword=this.value.toLowerCase();
+
+let filtered=globalData.filter(row=>
+
+Object.values(row).some(val=>
+
+String(val).toLowerCase().includes(keyword)
+
+)
+
+);
+
+renderTable(filtered);
+
+});
+
+function renderTable(data){
+
+if(data.length===0){
+
+document.getElementById("table").innerHTML="Tidak ada data";
+
+return;
+
+}
+
+let header=Object.keys(data[0]);
+
+let html="<table>";
+
+html+="<tr>";
+
+header.forEach(h=>{
+
+html+="<th>"+h+"</th>";
+
+});
+
+html+="</tr>";
+
+data.forEach(row=>{
+
+html+="<tr>";
+
+header.forEach(h=>{
+
+html+="<td>"+row[h]+"</td>";
+
+});
+
+html+="</tr>";
+
+});
+
+html+="</table>";
+
+document.getElementById("table").innerHTML=html;
+
+}
+
+</script>
+
+
+</body>
+
+</html>
