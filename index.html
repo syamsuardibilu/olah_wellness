@@ -1,211 +1,263 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Olah Data Wellness</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      padding: 15px;
+      margin: 0;
+    }
 
-<meta charset="UTF-8">
+    .container {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    h2 {
+      margin-top: 0;
+      color: #1f2d3d;
+    }
 
-<title>Olah Data Wellness</title>
+    input[type="file"] {
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
 
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    .search {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
 
-<style>
+    .summary {
+      margin-top: 12px;
+      margin-bottom: 12px;
+      font-weight: bold;
+      color: #2c3e50;
+      line-height: 1.6;
+    }
 
-body{
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
 
-font-family:Arial, sans-serif;
-background:#f4f7fb;
-padding:15px;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: white;
+    }
 
-}
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
 
-.container{
+    th {
+      background: #e9eef5;
+      position: sticky;
+      top: 0;
+    }
 
-background:white;
-padding:15px;
-border-radius:12px;
-box-shadow:0 4px 15px rgba(0,0,0,0.08);
+    tr:nth-child(even) {
+      background: #f8fbff;
+    }
 
-}
-
-h2{
-
-margin-top:0;
-color:#1f2d3d;
-
-}
-
-input{
-
-margin-top:10px;
-
-}
-
-.summary{
-
-margin-top:10px;
-font-weight:bold;
-color:#2c3e50;
-
-}
-
-table{
-
-width:100%;
-border-collapse:collapse;
-margin-top:15px;
-font-size:13px;
-
-}
-
-th,td{
-
-border:1px solid #ddd;
-padding:6px;
-text-align:left;
-
-}
-
-th{
-
-background:#e9eef5;
-
-}
-
-tr:nth-child(even){
-
-background:#f8fbff;
-
-}
-
-.search{
-
-margin-top:10px;
-width:100%;
-padding:6px;
-
-}
-
-</style>
-
+    .note {
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
 </head>
-
 <body>
+  <div class="container">
+    <h2>Upload Excel Wellness</h2>
 
-<div class="container">
+    <input type="file" id="file" accept=".xlsx,.xls" />
 
-<h2>Upload Excel Wellness</h2>
+    <input
+      type="text"
+      id="search"
+      class="search"
+      placeholder="Cari nama, unit, email, atau data lain..."
+    />
 
-<input type="file" id="file">
+    <div class="summary" id="info"></div>
+    <div class="note">
+      Data otomatis dibersihkan dari duplikat berdasarkan kolom nama.
+    </div>
 
-<input type="text" id="search" class="search" placeholder="Cari data...">
+    <div class="table-wrap">
+      <div id="table"></div>
+    </div>
+  </div>
 
-<div class="summary" id="info"></div>
+  <script>
+    let globalData = [];
+    let originalCount = 0;
+    let uniqueCount = 0;
+    let nameColumnUsed = "";
 
-<div id="table"></div>
+    document.getElementById("file").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
 
-</div>
+      const reader = new FileReader();
 
-<script>
+      reader.onload = function (event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
 
-let globalData=[];
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-document.getElementById("file").addEventListener("change",function(e){
+        originalCount = json.length;
 
-let reader=new FileReader();
+        const detectedNameColumn = detectNameColumn(json);
+        nameColumnUsed = detectedNameColumn || "";
 
-reader.onload=function(event){
+        globalData = removeDuplicatesByName(json, detectedNameColumn);
+        uniqueCount = globalData.length;
 
-let data=new Uint8Array(event.target.result);
+        updateInfo(sheetName, globalData.length);
+        renderTable(globalData);
+      };
 
-let workbook=XLSX.read(data,{type:"array"});
+      reader.readAsArrayBuffer(file);
+    });
 
-let sheet=workbook.SheetNames[0];
+    document.getElementById("search").addEventListener("keyup", function () {
+      const keyword = this.value.toLowerCase().trim();
 
-let worksheet=workbook.Sheets[sheet];
+      const filtered = globalData.filter(row =>
+        Object.values(row).some(val =>
+          String(val).toLowerCase().includes(keyword)
+        )
+      );
 
-globalData=XLSX.utils.sheet_to_json(worksheet,{defval:""});
+      updateFilteredInfo(filtered.length);
+      renderTable(filtered);
+    });
 
-document.getElementById("info").innerHTML=
+    function detectNameColumn(data) {
+      if (!data || data.length === 0) return null;
 
-"Sheet : "+sheet+
-"<br>Total data : "+globalData.length;
+      const headers = Object.keys(data[0]);
 
-renderTable(globalData);
+      const priorityColumns = [
+        "Personnel Number",
+        "Nama",
+        "Nama Pegawai",
+        "Full Name",
+        "Employee Name",
+        "Name"
+      ];
 
-}
+      for (const col of priorityColumns) {
+        if (headers.includes(col)) return col;
+      }
 
-reader.readAsArrayBuffer(e.target.files[0]);
+      return headers[0] || null;
+    }
 
-});
+    function removeDuplicatesByName(data, nameColumn) {
+      if (!nameColumn) return data;
 
-document.getElementById("search").addEventListener("keyup",function(){
+      const seen = new Set();
+      const result = [];
 
-let keyword=this.value.toLowerCase();
+      for (const row of data) {
+        const rawName = row[nameColumn];
+        const cleanName = String(rawName || "").trim().toLowerCase();
 
-let filtered=globalData.filter(row=>
+        if (!cleanName) continue;
 
-Object.values(row).some(val=>
+        if (!seen.has(cleanName)) {
+          seen.add(cleanName);
+          result.push(row);
+        }
+      }
 
-String(val).toLowerCase().includes(keyword)
+      return result;
+    }
 
-)
+    function updateInfo(sheetName, currentCount) {
+      const info = document.getElementById("info");
+      info.innerHTML =
+        "Sheet: " + sheetName + "<br>" +
+        "Jumlah data awal: " + originalCount + "<br>" +
+        "Jumlah data setelah hapus duplikat: " + uniqueCount + "<br>" +
+        "Kolom nama yang dipakai: " + (nameColumnUsed || "-") + "<br>" +
+        "Jumlah data yang sedang tampil: " + currentCount;
+    }
 
-);
+    function updateFilteredInfo(currentCount) {
+      const info = document.getElementById("info");
+      info.innerHTML =
+        "Jumlah data awal: " + originalCount + "<br>" +
+        "Jumlah data setelah hapus duplikat: " + uniqueCount + "<br>" +
+        "Kolom nama yang dipakai: " + (nameColumnUsed || "-") + "<br>" +
+        "Jumlah data yang sedang tampil: " + currentCount;
+    }
 
-renderTable(filtered);
+    function renderTable(data) {
+      const tableDiv = document.getElementById("table");
 
-});
+      if (!data || data.length === 0) {
+        tableDiv.innerHTML = "<p>Tidak ada data yang tampil.</p>";
+        return;
+      }
 
-function renderTable(data){
+      const headers = Object.keys(data[0]);
 
-if(data.length===0){
+      let html = "<table>";
+      html += "<thead><tr>";
 
-document.getElementById("table").innerHTML="Tidak ada data";
+      headers.forEach(header => {
+        html += "<th>" + escapeHtml(header) + "</th>";
+      });
 
-return;
+      html += "</tr></thead><tbody>";
 
-}
+      data.forEach(row => {
+        html += "<tr>";
+        headers.forEach(header => {
+          html += "<td>" + escapeHtml(row[header]) + "</td>";
+        });
+        html += "</tr>";
+      });
 
-let header=Object.keys(data[0]);
+      html += "</tbody></table>";
 
-let html="<table>";
+      tableDiv.innerHTML = html;
+    }
 
-html+="<tr>";
-
-header.forEach(h=>{
-
-html+="<th>"+h+"</th>";
-
-});
-
-html+="</tr>";
-
-data.forEach(row=>{
-
-html+="<tr>";
-
-header.forEach(h=>{
-
-html+="<td>"+row[h]+"</td>";
-
-});
-
-html+="</tr>";
-
-});
-
-html+="</table>";
-
-document.getElementById("table").innerHTML=html;
-
-}
-
-</script>
-
-
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
 </body>
-
 </html>
